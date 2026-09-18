@@ -1,0 +1,2 @@
+instance-id: packer-ubuntu-noble
+local-hostname: ubuntu-server

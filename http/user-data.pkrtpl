@@ -1,0 +1,71 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: ${locale}
+  keyboard:
+    layout: us
+  identity:
+    hostname: ${hostname}
+    username: ${ssh_username}
+    password: "${ssh_password_hash}"
+  network:
+    version: 2
+    ethernets:
+      id0:
+        match:
+          name: "en*"
+        dhcp4: true
+        dhcp-identifier: mac
+      id1:
+        match:
+          name: "eth*"
+        dhcp4: true
+        dhcp-identifier: mac
+  ssh:
+    install-server: true
+    allow-pw: true
+    disable_root: true
+  packages:
+    - qemu-guest-agent
+    - sudo
+    - python3
+  storage:
+    layout:
+      name: direct
+    swap:
+      size: 0
+  # Install a one-shot first-boot helper before the target system boots so
+  # qemu-guest-agent and ssh are up earlier than cloud-init runcmd. Script and
+  # unit contents are inlined here (templatefile cannot use Packer's
+  # {{ .HTTPIP }}); a leading ">" is stripped so YAML indentation stays valid.
+  late-commands:
+    - |
+      set -eu
+      mkdir -p /target/usr/local/sbin /target/etc/systemd/system
+      sed 's/^[[:space:]]*>//' > /target/usr/local/sbin/packer-firstboot-ready.sh << 'FIRSTBOOT_SCRIPT_EOF'
+%{ for line in split("\n", firstboot_script) ~}
+      >${line}
+%{ endfor ~}
+      FIRSTBOOT_SCRIPT_EOF
+      chmod 0755 /target/usr/local/sbin/packer-firstboot-ready.sh
+      sed 's/^[[:space:]]*>//' > /target/etc/systemd/system/packer-firstboot-ready.service << 'FIRSTBOOT_UNIT_EOF'
+%{ for line in split("\n", firstboot_unit) ~}
+      >${line}
+%{ endfor ~}
+      FIRSTBOOT_UNIT_EOF
+      chmod 0644 /target/etc/systemd/system/packer-firstboot-ready.service
+    - curtin in-target --target=/target systemctl daemon-reload
+    - curtin in-target --target=/target systemctl enable qemu-guest-agent.service ssh.service packer-firstboot-ready.service
+  user-data:
+    package_upgrade: false
+    timezone: ${timezone}
+    users:
+      - name: ${ssh_username}
+        passwd: "${ssh_password_hash}"
+        groups: [adm, sudo]
+        lock-passwd: false
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        shell: /bin/bash
+    runcmd:
+      - systemctl restart qemu-guest-agent || systemctl start qemu-guest-agent || true
+      - systemctl restart ssh || systemctl start ssh || true

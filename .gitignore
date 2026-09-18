@@ -1,0 +1,10 @@
+.vscode
+
+packer_cache
+
+isos
+
+vars
+
+config.json
+config.pkrvars.hcl

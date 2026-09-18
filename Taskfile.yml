@@ -1,0 +1,44 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  packer_args: '-var-file="./config.pkrvars.hcl"'
+  ubuntu_24_04_iso_name: ubuntu-24.04.3-live-server-amd64.iso
+  ubuntu_24_04_iso_url: https://releases.ubuntu.com/24.04/ubuntu-24.04.3-live-server-amd64.iso
+
+tasks:
+  init:
+    desc: Copy example vars to a local gitignored config file
+    cmds:
+      - cp ./example-vars.pkrvars.hcl ./config.pkrvars.hcl
+    status:
+      - test -f config.pkrvars.hcl
+
+  init-plugins:
+    desc: Install required Packer plugins
+    cmds:
+      - packer init .
+
+  validate:
+    desc: Validate the Packer template with local config
+    cmds:
+      - packer init .
+      - packer validate {{.packer_args}} .
+
+  build:
+    desc: Build the Ubuntu 24.04 Proxmox template
+    cmds:
+      - packer init .
+      - packer build {{.packer_args}} .
+
+  cleanup-isos:
+    desc: Remove locally downloaded ISOs
+    cmds:
+      - rm -rf ./isos
+
+  ubuntu-24-iso:
+    desc: Download the Ubuntu 24.04 live-server ISO for upload to PVE
+    cmds:
+      - mkdir -p ./isos
+      - curl -C - -L -o ./isos/{{.ubuntu_24_04_iso_name}} {{.ubuntu_24_04_iso_url}}
